@@ -489,7 +489,7 @@ class Server:
 
                 self.user(client_socket, username, real_name, mode_i=mode_i, mode_w=mode_w)
             elif chat_message.startswith('/who'):
-                parameters = chat_message.replace('/who', '', 1).strip.split(" ")
+                parameters = chat_message.replace('/who', '', 1).strip().split(" ")
                 if len(parameters) == 0:
                     self.who(client_socket, None, False)
                 elif len(parameters) == 1:
@@ -601,6 +601,7 @@ class Server:
         name = self.clients[client_socket]
         if name not in self.clients_nicknames.values():
             self.clients_passwords[name] = set_password
+            client_socket.send("Successfully set new password!\n\n".encode('utf8'))
 
     def restart_server(self):
         self.server_shutdown()
@@ -616,6 +617,7 @@ class Server:
 
     def set_name(self, client_socket, set_the_name):
         self.clients[client_socket] = set_the_name
+        client_socket.send("Name is Set\n\n".encode('utf8'))
 
     def invite(self, client_socket, nickname, channel_name):
         # Channel does not exist
