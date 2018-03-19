@@ -202,7 +202,7 @@ if __name__ == "__main__":
     arguments = argument_parser.parse_args()
     config_object = utils.get_config_from_file(getattr(arguments, "c"))
 
-    hostname_setting = getattr(arguments, "h")
+    hostname_setting = getattr(arguments, "hostname")
     if hostname_setting is None:
         hostname_setting = config_object.get("last_server_used")
         if hostname_setting is None:
@@ -250,6 +250,8 @@ if __name__ == "__main__":
     chatGUI.clientSocket.connect(
         hostname_setting, port_setting, username_setting
     )
+    if chatGUI.clientSocket.is_client_connected:
+        SocketThreadedTask(chatGUI.clientSocket, chatGUI.ChatWindow.update_chat_window).start()
     if test_file_setting is not None:
         commands = utils.get_file_lines(test_file_setting)
         commands_fixed = \
