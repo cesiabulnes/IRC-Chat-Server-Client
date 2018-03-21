@@ -3,10 +3,9 @@ import socket
 import sys
 import os
 import threading
-from time import gmtime, strftime
+# from time import gmtime, strftime
 import utils
-
-
+import time
 start_server = None
 
 
@@ -182,6 +181,16 @@ class Server:
     > The list of commands available are:
     /quit - Exits the program.
     /list - Lists all the users in the chat room.
+    please refer to https://tools.ietf.org/html/rfc2812 for the parameters of each command
+    The commands supported by this chat are:
+    AWAY CONNECT DIE
+HELP INFO INVITE ISON
+JOIN
+KICK
+KILL KNOCK LIST MODE NICK NOTICE PART OPER PASS
+PING PONG PRIVMSG QUIT RESTART RULES SETNAME SILENCE TIME TOPIC USER USERHOST USERIP USERS VERSION W ALLOPS
+ 
+WHO WHOIS
     \n\n""".encode('utf8')
 
     def __init__(self,
@@ -302,7 +311,7 @@ class Server:
                     target_port = 80
                 self.server_connect(client_socket, target_server, target_port)
             elif chat_message == '/die':
-                self.server_die()
+                self.server_die(client_socket)
             elif chat_message.startswith('/info'):
                 remote_server = chat_message.replace('/info', '', 1).strip()
                 self.server_information(client_socket, remote_server)
@@ -361,12 +370,13 @@ class Server:
             elif chat_message.startswith('/silence'):
                 parameters = chat_message.replace('/silence', '', 1).strip().split()
                 ignore_list = ",".join(self.ignore_list)
-                if len(parameters) == 0: # assuming you need a + or a - before the name being silenced
+                if len(parameters) == 0:  # assuming you need a + or a - before the name being silenced
                     client_socket.send((ignore_list + "\n\n").encode('utf8'))
-                self.silence(client_socket, parameters)
+                else :
+                    self.silence(client_socket, parameters)
             elif chat_message.startswith('/join'):
-                parameters = chat_message.replace('/join', '', 1).strip.split()
-
+                parameters = chat_message.replace('/join', '', 1).strip().split()
+                '''''
                 leave_groups = False
                 if len(parameters) == 3 and parameters[2] == "0":
                     leave_groups = True
@@ -377,17 +387,20 @@ class Server:
                     for channel in self.channel_users:
                         if name in self.channel_users[channel]:
                             self.channel_users[channel].remove(name)
-
+                
                 if len(parameters) == 2 or len(parameters) == 3:
                     channels = parameters[0].split(",")
                     passwords = parameters[1].split(",")
                     for (channel, password) in zip(channels, passwords):
                         if password == "@":
                             password = None
+                
                         self.join(client_socket, channel, password)
-                elif len(parameters) == 1 and parameters[0] != "0":
-                    channels = parameters[0].split(",")
-                    self.join(client_socket, channels)
+                        '''''
+                if len(parameters) == 1 and parameters[0] != "0":
+                    # channels = parameters[0].split(",")
+                    channel = parameters[0]
+                    self.join(client_socket, channel)
             elif chat_message.startswith('/oper'):
                 parameters = chat_message.replace('/oper', '', 1).strip().split()
                 if len(parameters) == 2:
@@ -395,7 +408,7 @@ class Server:
                     password = parameters[1]
                     self.oper(client_socket, username, password)
             elif chat_message.startswith('/mode'):
-                parameters = chat_message.replace('/oper', '', 1).strip().split()
+                parameters = chat_message.replace('/mode', '', 1).strip().split()
                 if len(parameters) == 3:
                     nickname = parameters[0]
                     add_remove = parameters[1]
@@ -419,7 +432,7 @@ class Server:
                 self.time(client_socket, parameter)
             elif chat_message.startswith('/userhost'):
                 parameters = chat_message.replace('/userhost', '', 1).strip().split(" ")
-                while parameters < 6 :
+                while len(parameters) < 6:
                     self.userhost(client_socket, parameters)
             elif chat_message.startswith('/kill'):
                 parameters = chat_message.replace('/kill','',1).strip().split(" ", 1)
@@ -435,17 +448,17 @@ class Server:
                     self.list(client_socket, channels)
 
             elif chat_message.startswith('/privmsg'):
-                parameters = chat_message.replace('/privmsg', '', 1).strip.split(" ")
+                parameters = chat_message.replace('/privmsg', '', 1).strip().split(" ")
                 if len(parameters) != 2:
                     continue
                 self.privmsg(client_socket, parameters[0], parameters[1])
             elif chat_message.startswith('/notice'):
-                parameters = chat_message.replace('/notice', '', 1).strip.split(" ")
+                parameters = chat_message.replace('/notice', '', 1).strip().split(" ")
                 if len(parameters) != 2:
                     continue
                 self.notice(parameters[0], parameters[1])
             elif chat_message.startswith('/knock'):
-                parameters = chat_message.replace('/knock', '', 1).strip.split(" ", 1)
+                parameters = chat_message.replace('/knock', '', 1).strip().split(" ", 1)
                 if len(parameters) == 2:
                     self.knock(client_socket, parameters[0], parameters[1])
                 else:
@@ -454,24 +467,29 @@ class Server:
                     )
                     self.knock(client_socket, parameters[0], automated_message)
             elif chat_message.startswith('/part'):
-                parameters = chat_message.replace('/part', '', 1).strip.split(" ", 1)
+                h = chat_message.replace('/part', '', 1)
+                print(h)
+                parameters = h.strip().split(" ", 1)
+                print(parameters)
                 if len(parameters) == 1:
-                    channels = parameters[0]
+                    channels = parameters
                     message = None
                     self.part(client_socket, channels, message)
                 elif len(parameters) ==2:
                     channels = parameters[0]
                     message = parameters[1]
+                    # print(channels)
                     self.part(client_socket, channels, message)
             elif chat_message.startswith('/user'):
-                parameters = chat_message.replace('/user', '', 1).strip.split(" ", 3)
-                if len(parameters) != 4 :
+                parameters = chat_message.replace('/user', '', 1).strip().split(" ", 3)
+                if len(parameters) != 4:
                     continue
 
                 username = parameters[0]
-                real_name = [3]
+                real_name = parameters[3]
                 try:
                     mode = "{0:b}".format(int(parameters[1]))[::-1]
+                    print(mode)
                 except ValueError:
                     continue
                 mode_i = False
@@ -506,7 +524,7 @@ class Server:
             elif chat_message.startswith('/pong'):
                 self.pong(client_socket)
             elif chat_message.startswith('/whois'):
-                parameters = chat_message.replace('/whois', '', 1).strip.split(" ")
+                parameters = chat_message.replace('/whois', '', 1).strip().split(" ")
                 if len(parameters) == 1:
                     self.whois(client_socket, parameters[0].split(","))
                 elif len(parameters) == 2:
@@ -557,8 +575,9 @@ class Server:
             error_message = '> Cannot make a connection to %s:%d\n' % (target_server, target_port)
             client_socket.send(error_message.encode('utf-8'))
 
-    def server_die(self):
-        self.broadcast_message('> Server is shutting down.\n'.encode('utf-8'))
+    def server_die(self, client_socket):
+        # self.broadcast_message('> Server is shutting down.\n'.encode('utf-8'))
+        client_socket.send('> Server is shutting down.\n'.encode('utf-8'))
         self.server_shutdown()
 
     def server_information(self, client_socket, remote_server):
@@ -665,37 +684,50 @@ class Server:
                     kicker_nickname=name
                 ).encode('utf8'))
 
-    def userip(self, client_socket,nickname):
+    def userip(self, client_socket, nickname):
         real_name = self.clients_nicknames[nickname]
         ip_address = self.client_ips[real_name]
-        client_socket.send((ip_address + '\n\n').encode('utf8'))
+        print(ip_address[0])
+        client_socket.send((ip_address[0] + '\n\n').encode('utf8'))
 
     def version(self,client_socket):
         client_socket.send("The version of this chat is version 1.0\n\n".encode('utf8'))
 
     def silence(self, client_socket, parameters):
         name = self.clients[client_socket]
-        add_or_remove= parameters[0]  # + or -
+        add_or_remove = parameters[0]  # + or -
         nickname_given = parameters[1]
-        if nickname_given in self.clients_nicknames.values(): # nickname of person you're trying to silence
+        print(nickname_given)
+        if nickname_given in self.clients_nicknames: # nickname of person you're trying to silence
+            print(nickname_given)
             if nickname_given not in self.ignore_list[name]: # if the nickname hasn't been silence
                 if add_or_remove == '+': # you may silence this person
                     self.ignore_list[name].append(nickname_given) # add this user to the ignore_list
+                    client_socket.send("person was silenced\n\n".encode('utf8'))
+
             if nickname_given in self.ignore_list[name]:  # if the nickname has been silenced
                 if add_or_remove == '-': # you may un-silence this person
                     self.ignore_list[name].remove(nickname_given) # remove this user from the ignore_list
+                    client_socket.send("person was removed from being silenced\n\n".encode('utf8'))
 
     def join(self, client_socket, channel, password=None):
-
+        ''''
         channel_password = self.db.channels[channel]['password']
         if channel_password and password != channel_password:
             client_socket.send("Channel requires a password and password specified did not match!\n\n".encode('utf8'))
             return
+        '''
 
-        username = self.clients[client_socket]
-        if username not in self.channel_users[channel]:
-            self.channel_users[channel].append(username)
+        username_ofperson = self.clients[client_socket]
+        if channel not in self.channel_users:
+            self.channel_users[channel] = []
+
+        if username_ofperson not in self.channel_users[channel]:
+            self.channel_users[channel].append(username_ofperson)
+            print(self.channel_users[channel])
             client_socket.send("Added you to channel {channel}\n\n".format(channel=channel).encode('utf8'))
+        else:
+            client_socket.send("You're in this channel {channel}\n\n".format(channel=channel).encode('utf8'))
 
     def oper(self, client_socket, username, password):
         if (username, password) in self.clients_passwords.items():
@@ -709,17 +741,26 @@ class Server:
     def mode(self, client_socket, nickname, add_remove, modes):
         real_name = self.clients[client_socket]
         if real_name == self.clients_nicknames[nickname]:
-            if modes == ('w' or 'i' or 'O' or 'o' or 'r'):
+
+            if modes == 'w' or 'i' or 'O' or 'o' or 'r':
+                print(modes)
                 if modes in self.mode_of_users:
-                    if real_name in self.mode_of_users[modes]:
+                    users_in_modes = self.mode_of_users[modes]
+                    print(users_in_modes)
+                    if real_name in users_in_modes:
                         if add_remove == '-':
-                            self.mode_of_users[modes].remove(real_name)
-                    elif real_name not in self.mode_of_users[modes]:
+                            users_in_modes.remove(real_name)
+                            client_socket.send("your mode has been removed\n\n".encode('utf8'))
+                    elif real_name not in users_in_modes:
                         if add_remove == '+':
-                            self.mode_of_users[modes].append(real_name)
+                            users_in_modes.append(real_name)
+                            client_socket.send("your mode has been added\n\n".encode('utf8'))
                 elif modes not in self.mode_of_users:
+                    self.mode_of_users[modes] = []
+                    users_in_modes = self.mode_of_users[modes]
                     if add_remove == '+':
-                        self.mode_of_users[modes].append(real_name)
+                        users_in_modes.append(real_name)
+                        client_socket.send("your mode has been added\n\n".encode('utf8'))
                     else:
                         client_socket.send("You cannot delete yourself from a mode that doesnt exist\n\n".encode('utf8'))
         else:
@@ -727,8 +768,10 @@ class Server:
 
     def wallops(self, client_socket, wallops_message):
         usernames_wallops = self.mode_of_users['w']
+        print(usernames_wallops)
         usernames_operators = self.mode_of_users['o']
-        wallops_and_operators = usernames_wallops + usernames_operators
+        print(usernames_operators)
+        wallops_and_operators = usernames_wallops or usernames_operators
         for username in wallops_and_operators:
             for (user_socket, current_username) in self.clients.items():
                 if username == current_username:
@@ -738,26 +781,32 @@ class Server:
     def topic(self, client_socket, channel, topic_message):
         if topic_message == " ":
             topic = self.channel_topic[channel]
-            client_socket.send((topic + '\n\n').encode(
+
+            client_socket.send(('the topic is {topic}' + '\n\n').format(topic=topic).encode(
                 'utf8'
             ))
-        self.channel_topic[channel].append(topic_message)
-        client_socket.send('topic was changed in {channel} with {topic_message}\n\n'.format(
-            channel=channel,
-            topic_message=topic_message
-        ).encode('utf8'))
+        else:
+            self.channel_topic[channel] = topic_message
+            client_socket.send('topic was changed in {channel} to {topic_message}\n\n'.format(
+                channel=channel,
+                topic_message=topic_message
+            ).encode('utf8'))
 
     def time(self, client_socket, target):
-        while socket.gethostbyname(target) == self.clients[client_socket]:
-            y = strftime("%a, %d %b %Y %H:%M:%S +0000\n\n", gmtime())
+            y = time.strftime("%I:%M:%S")
             client_socket.send(y.encode('utf8'))
 
     def userhost(self,client_socket, nickname_list):
+
         for nickname in nickname_list:
-            if nickname in self.clients_nicknames :
+            if nickname in self.clients_nicknames:
+                print(nickname)
                 real_name = self.clients_nicknames[nickname]
-                ip_address = self.client_ips[real_name]
+                ip = self.client_ips[real_name]
+                print(ip[0])
+                ip_address = ip
                 user_name = self.client_usernames[real_name]
+                print(user_name)
                 client_socket.send('The user with the nickname {nickname} ,'
                                    ' has the real name of {real_name} , ip address: {ip_address}, '
                                    'username: {user_name}\n\n'.format(
@@ -785,7 +834,7 @@ class Server:
                         user_socket.send(message + "\n\n")
                         if self.clients_away.get(user_socket, None):
                             away_message = self.clients_away[user_socket]
-                            client_socket.send(away_message)
+                            client_socket.send(away_message.encode('utf8'))
                         return
 
         for (user_socket, user_name) in self.clients.items():
@@ -793,7 +842,7 @@ class Server:
                 user_socket.send(message + "\n\n")
                 if self.clients_away.get(user_socket, None):
                     away_message = self.clients_away[user_socket]
-                    client_socket.send(away_message)
+                    client_socket.send(away_message.encode('utf8'))
                     return
 
     def notice(self, msgtarget, message):
@@ -813,13 +862,17 @@ class Server:
     def list(self, client_socket, channels):
         list_message = ""
         if channels is None:
-            for (channel, topic) in self.channel_topic:
-                list_message += '%s : %s\n' % channel, topic
+            print('hi')
+            print(self.channel_topic.items())
+            print('hi')
+            for (channel, topic) in self.channel_topic.items():
+                list_message = '%s : %s\n' % channel, topic
             client_socket.send('Channels Info: {list_message}\n\n'.format(list_message=list_message).encode('utf8'))
         else:
             for channel in channels:
                 if channel in self.channel_topic:
                     topic = self.channel_topic[channel]
+                    print(topic)
                     list_message += '%s : %s\n' % channel, topic
             client_socket.send('Channels Info: {list_message}\n\n'.format(list_message=list_message).encode('utf8'))
 
@@ -844,9 +897,10 @@ class Server:
                     message = nickname
 
         for channel in channels:
-            channel_users = self.channel_users.get(channel, [])
-            if real_name in channel_users:
-                channel_users.remove(real_name)
+            channel_user = self.channel_users[channel]
+            print(channel_user)
+            if real_name in channel_user:
+                channel_user.remove(real_name)
                 for user in self.channel_users[channel]:
                     for (user_socket, user_name) in self.clients.items():
                         if user == user_name:
@@ -855,24 +909,32 @@ class Server:
                                 channel=channel,
                                 message=message
                             ).encode('utf8'))
-                self.channel_users[channel] = channel_users
+                self.channel_users[channel] = channel_user
             client_socket.send('You have parted channel {channel}\n\n'.format(
                 channel=channel
             ).encode('utf8'))
 
     def user(self, client_socket, username, real_name, mode_i, mode_w):
         self.clients[client_socket] = real_name
+        print(real_name)
+        x = self.clients[client_socket]
+        print(x)
         if real_name not in self.client_usernames:
-            self.client_usernames[real_name] = username
-
-            if mode_i:
+            print(real_name)
+            self.client_usernames[real_name] = []
+            self.db.users[real_name]=[]
+            self.client_usernames[real_name].append(username)
+            self.db.users[real_name].append(username)
+            if mode_i == 'i':
                 mode_i_users = self.mode_of_users.get('i', [])
                 mode_i_users.append(real_name)
                 self.mode_of_users['i'] = mode_i_users
-            if mode_w:
+                print(mode_i_users)
+            if mode_w == 'w':
                 mode_w_users = self.mode_of_users.get('w', [])
                 mode_w_users.append(real_name)
                 self.mode_of_users['w'] = mode_w_users
+                print(mode_w_users)
             client_socket.send('You have successfully been set as a user\n\n'.encode('utf8'))
         else:
             client_socket.send('Someone else has your username, try again\n\n'.encode('utf8'))
@@ -883,6 +945,7 @@ class Server:
             message = ""
             for (_, some_name) in self.clients.items():
                 if some_name not in self.mode_of_users.get('i', []):
+                    print(some_name)
                     message += "User {user}\n".format(user=some_name)
             client_socket.send((message + "\n\n").encode('utf-8'))
             return
@@ -911,6 +974,7 @@ class Server:
     def whois(self, client_socket, nicknames):
         message = ""
         for nickname in nicknames:
+            print('hi')
             message += "Info about {nickname}\n".format(nickname=nickname)
             if nickname in self.clients_nicknames:
                 real_name = self.clients_nicknames[nickname]
