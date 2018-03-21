@@ -423,16 +423,15 @@ WHO WHOIS
                 channel = new_parameters[0]
                 if len(new_parameters) == 2:
                     topic_message = new_parameters[1]
-                    self.topic(client_socket, channel , topic_message)
-                if len(new_parameters) == 1 :
-                    topic_message = " "
                     self.topic(client_socket, channel, topic_message)
+                if len(new_parameters) == 1 :
+                    self.topic(client_socket, channel, None)
             elif chat_message.startswith('/time'):
                 parameter = chat_message.replace('/time', '', 1).strip()
                 self.time(client_socket, parameter)
             elif chat_message.startswith('/userhost'):
                 parameters = chat_message.replace('/userhost', '', 1).strip().split(" ")
-                while len(parameters) < 6:
+                if len(parameters) < 6:
                     self.userhost(client_socket, parameters)
             elif chat_message.startswith('/kill'):
                 parameters = chat_message.replace('/kill','',1).strip().split(" ", 1)
@@ -440,10 +439,11 @@ WHO WHOIS
                 message = parameters[1]
                 self.kill(client_socket, nickname, message)
             elif chat_message.startswith('/list'):
-                parameters = chat_message.replace('/list', '' , 1).strip().split(" ")
-                if len(parameters) == 0:
-                    self.list(client_socket,None)
+                parameters = chat_message.replace('/list', '', 1).strip().split(" ")
+                print(len(parameters))
                 if len(parameters) == 1:
+                    self.list(client_socket, None)
+                elif len(parameters) > 1:
                     channels = parameters[0].split(',')
                     self.list(client_socket, channels)
 
@@ -451,7 +451,8 @@ WHO WHOIS
                 parameters = chat_message.replace('/privmsg', '', 1).strip().split(" ")
                 if len(parameters) != 2:
                     continue
-                self.privmsg(client_socket, parameters[0], parameters[1])
+                else:
+                    self.privmsg(client_socket, parameters[0], parameters[1])
             elif chat_message.startswith('/notice'):
                 parameters = chat_message.replace('/notice', '', 1).strip().split(" ")
                 if len(parameters) != 2:
@@ -506,6 +507,10 @@ WHO WHOIS
                     pass
 
                 self.user(client_socket, username, real_name, mode_i=mode_i, mode_w=mode_w)
+            elif chat_message.startswith('/whois'):
+                parameters = chat_message.replace('/whois', '', 1).strip().split(" ")
+                if len(parameters) == 1:
+                    self.whois(client_socket, parameters)
             elif chat_message.startswith('/who'):
                 parameters = chat_message.replace('/who', '', 1).strip().split(" ")
                 if len(parameters) == 0:
@@ -523,12 +528,9 @@ WHO WHOIS
                 self.ping(client_socket)
             elif chat_message.startswith('/pong'):
                 self.pong(client_socket)
-            elif chat_message.startswith('/whois'):
-                parameters = chat_message.replace('/whois', '', 1).strip().split(" ")
-                if len(parameters) == 1:
-                    self.whois(client_socket, parameters[0].split(","))
-                elif len(parameters) == 2:
-                    self.whois(client_socket, parameters[1].split(","))
+
+               # elif len(parameters) == 2:
+                  #  self.whois(client_socket, parameters[1].split(","))
             else:
                 self.broadcast_message(chat_message + '\n', name + ': ')
 
@@ -640,7 +642,7 @@ WHO WHOIS
 
     def invite(self, client_socket, nickname, channel_name):
         # Channel does not exist
-        if channel_name not in self.db.channels:
+        if channel_name not in self.channel_users:
             client_socket.send("That channel does not exist!\n\n".encode('utf8'))
             return
 
@@ -649,7 +651,8 @@ WHO WHOIS
             real_name = self.clients_nicknames[nickname]
             for (recipient_socket, recipient_name) in self.clients.items():
                 if recipient_name == real_name:
-                    invitation_message = "You were invited to join channel %s\n\n" % channel_name
+                    invitation_message = "You were invited to join channel %s" % channel_name
+                    invitation_message = invitation_message + (",to join simply write /join %s\n" % channel_name)
                     recipient_socket.send(invitation_message.encode('utf8'))
                     client_socket.send("Successfully invited user!\n\n".encode('utf8'))
         except KeyError:
@@ -697,17 +700,19 @@ WHO WHOIS
         name = self.clients[client_socket]
         add_or_remove = parameters[0]  # + or -
         nickname_given = parameters[1]
-        print(nickname_given)
+
         if nickname_given in self.clients_nicknames: # nickname of person you're trying to silence
-            print(nickname_given)
-            if nickname_given not in self.ignore_list[name]: # if the nickname hasn't been silence
+
+            if name not in self.ignore_list:  # if the nickname hasn't been silence
                 if add_or_remove == '+': # you may silence this person
-                    self.ignore_list[name].append(nickname_given) # add this user to the ignore_list
+
+                    self.ignore_list[name] = nickname_given  # add this user to the ignore_list
                     client_socket.send("person was silenced\n\n".encode('utf8'))
 
-            if nickname_given in self.ignore_list[name]:  # if the nickname has been silenced
+            if name in self.ignore_list:  # if the nickname has been silenced
                 if add_or_remove == '-': # you may un-silence this person
-                    self.ignore_list[name].remove(nickname_given) # remove this user from the ignore_list
+                    print(add_or_remove)
+                    del self.ignore_list[name]   # remove this user from the ignore_list
                     client_socket.send("person was removed from being silenced\n\n".encode('utf8'))
 
     def join(self, client_socket, channel, password=None):
@@ -724,6 +729,7 @@ WHO WHOIS
 
         if username_ofperson not in self.channel_users[channel]:
             self.channel_users[channel].append(username_ofperson)
+
             print(self.channel_users[channel])
             client_socket.send("Added you to channel {channel}\n\n".format(channel=channel).encode('utf8'))
         else:
@@ -731,7 +737,9 @@ WHO WHOIS
 
     def oper(self, client_socket, username, password):
         if (username, password) in self.clients_passwords.items():
-            for channel, name in self.channel_users:
+            print('yo')
+            for (channel, name) in self.channel_users.items():
+                print('yop')
                 if username == name:
                     operator_list = self.db.channels[channel]['channelops']
                     if username not in operator_list:
@@ -779,10 +787,10 @@ WHO WHOIS
         client_socket.send('Your message has been sent to users users with modes operators and wallops\n\n'.encode('utf8'))
 
     def topic(self, client_socket, channel, topic_message):
-        if topic_message == " ":
+        if topic_message is None:
             topic = self.channel_topic[channel]
 
-            client_socket.send(('the topic is {topic}' + '\n\n').format(topic=topic).encode(
+            client_socket.send(('the topic in {channel} is {topic}' + '\n\n').format(channel=channel,topic=topic).encode(
                 'utf8'
             ))
         else:
@@ -797,21 +805,26 @@ WHO WHOIS
             client_socket.send(y.encode('utf8'))
 
     def userhost(self,client_socket, nickname_list):
-
-        for nickname in nickname_list:
-            if nickname in self.clients_nicknames:
-                print(nickname)
-                real_name = self.clients_nicknames[nickname]
-                ip = self.client_ips[real_name]
-                print(ip[0])
-                ip_address = ip
-                user_name = self.client_usernames[real_name]
-                print(user_name)
-                client_socket.send('The user with the nickname {nickname} ,'
-                                   ' has the real name of {real_name} , ip address: {ip_address}, '
-                                   'username: {user_name}\n\n'.format(
-                                    nickname=nickname, real_name=real_name,
-                                    ip_address=ip_address, user_name=user_name).encode('utf8'))
+        x = len(nickname_list)
+        print(x)
+        i=0
+        while i < x:
+            for nickname in nickname_list:
+                if nickname in self.clients_nicknames:
+                    print(nickname)
+                    real_name = self.clients_nicknames[nickname]
+                    print(real_name)
+                    ip = self.client_ips[real_name]
+                    print(ip[0])
+                    ip_address = ip[0]
+                    user_name = self.client_usernames[real_name]
+                    print(user_name)
+                    client_socket.send('The user with the nickname {nickname} ,'
+                                       ' has the real name of {real_name} , ip address: {ip_address}, '
+                                       'username: {user_name}\n\n'.format(
+                                        nickname=nickname, real_name=real_name,
+                                        ip_address=ip_address, user_name=user_name).encode('utf8'))
+            i = i+ 1
 
     def kill(self, client_socket, nickname, comment):
         my_real_name = self.clients[client_socket]
@@ -826,57 +839,76 @@ WHO WHOIS
                                                 comment))
 
     def privmsg(self, client_socket, msgtarget, message):
-        if self.db.channels.get(msgtarget, None) is not None:
-            users = self.channel_users[msgtarget]
-            for user in users:
+        print(msgtarget)
+        print(self.channel_users.values())
+
+        if msgtarget not in self.channel_users.values():
+            channel = 'me' + msgtarget
+            if channel not in self.channel_users:
+                self.channel_users[channel] = []
+            if msgtarget not in self.channel_users[channel]:
+                self.channel_users[channel].append(msgtarget)
+
+                print(self.channel_users[channel])
                 for (user_socket, user_name) in self.clients.items():
-                    if user == user_name:
-                        user_socket.send(message + "\n\n")
-                        if self.clients_away.get(user_socket, None):
-                            away_message = self.clients_away[user_socket]
-                            client_socket.send(away_message.encode('utf8'))
+                    if msgtarget == user_name:  # name
+                        user_socket.send((message + "\n\n").encode('utf8'))
+                        print('done')
                         return
-
-        for (user_socket, user_name) in self.clients.items():
-            if msgtarget == user_name:
-                user_socket.send(message + "\n\n")
-                if self.clients_away.get(user_socket, None):
-                    away_message = self.clients_away[user_socket]
-                    client_socket.send(away_message.encode('utf8'))
-                    return
-
-    def notice(self, msgtarget, message):
-        if self.db.channels.get(msgtarget, None) is not None:
+        if msgtarget in self.channel_users.keys():
+            print(self.channel_users[msgtarget])
             users = self.channel_users[msgtarget]
+            print(users)
             for user in users:
                 for (user_socket, user_name) in self.clients.items():
                     if user == user_name:
                         user_socket.send((message + "\n\n").encode('utf8'))
+                        print('hi')
                         return
 
-        for (user_socket, user_name) in self.clients.items():
-            if msgtarget == user_name:
-                user_socket.send((message + "\n\n").encode('utf8'))
-                return
+
+    def notice(self, msgtarget, message):
+        # msgtarget = channel_name
+        if self.channel_users[msgtarget] is not None:
+            print(self.channel_users[msgtarget])
+            users = self.channel_users[msgtarget]
+            print(users)
+            for user in users:
+                for (user_socket, user_name) in self.clients.items():
+                    if user == user_name:
+                        user_socket.send((message + "\n\n").encode('utf8'))
+                        print('hi')
+                        return
 
     def list(self, client_socket, channels):
         list_message = ""
         if channels is None:
-            print('hi')
             print(self.channel_topic.items())
-            print('hi')
             for (channel, topic) in self.channel_topic.items():
-                list_message = '%s : %s\n' % channel, topic
-            client_socket.send('Channels Info: {list_message}\n\n'.format(list_message=list_message).encode('utf8'))
+                list_message = list_message + 'channel: ' + channel + ',' + 'topic: ' + topic + '\n'
+            client_socket.send('Channels Information: {list_message}\n\n'.format(list_message=list_message).encode('utf8'))
         else:
             for channel in channels:
                 if channel in self.channel_topic:
                     topic = self.channel_topic[channel]
-                    print(topic)
-                    list_message += '%s : %s\n' % channel, topic
+                    list_message = list_message + 'channel:' + channel + ',' + 'topic' + topic + '\n'
             client_socket.send('Channels Info: {list_message}\n\n'.format(list_message=list_message).encode('utf8'))
 
     def knock(self, client_socket, channel_target, message):
+        name = self.clients[client_socket]
+        if self.channel_users[channel_target] is not None:
+            print(self.channel_users[channel_target])
+            users = self.channel_users[channel_target]
+            print(users)
+            for user in users:
+                for (user_socket, user_name) in self.clients.items():
+                    if user == user_name:
+                        user_socket.send(('{name} is requesting to join {channel_target} because : ' + '"'+ message +
+                                          '"' + "\n\n")
+                                         .format(name=name,channel_target = channel_target).encode('utf8'))
+                        print('hi')
+                        return
+        '''
         if self.db.channels.get(channel_target, None) is not None:
             users = self.channel_users[channel_target]
             for user in users:
@@ -887,6 +919,7 @@ WHO WHOIS
                             'utf8'
                         ))
                         return
+        '''
 
     def part(self, client_socket, channels, message):
         real_name = self.clients[client_socket]
@@ -915,29 +948,31 @@ WHO WHOIS
             ).encode('utf8'))
 
     def user(self, client_socket, username, real_name, mode_i, mode_w):
-        self.clients[client_socket] = real_name
         print(real_name)
-        x = self.clients[client_socket]
-        print(x)
-        if real_name not in self.client_usernames:
+        print(self.clients[client_socket])
+        if real_name == self.clients[client_socket]:
             print(real_name)
+            client_address = self.client_ips[real_name]
+            print(client_address)
             self.client_usernames[real_name] = []
-            self.db.users[real_name]=[]
+            self.db.users[real_name] = []
             self.client_usernames[real_name].append(username)
+            print(self.client_usernames[real_name])
             self.db.users[real_name].append(username)
+            x = self.clients[client_socket]
+            print(x)
+
             if mode_i == 'i':
-                mode_i_users = self.mode_of_users.get('i', [])
-                mode_i_users.append(real_name)
-                self.mode_of_users['i'] = mode_i_users
-                print(mode_i_users)
+                    mode_i_users = self.mode_of_users.get('i', [])
+                    mode_i_users.append(real_name)
+                    self.mode_of_users['i'] = mode_i_users
+                    print(mode_i_users)
             if mode_w == 'w':
-                mode_w_users = self.mode_of_users.get('w', [])
-                mode_w_users.append(real_name)
-                self.mode_of_users['w'] = mode_w_users
-                print(mode_w_users)
+                    mode_w_users = self.mode_of_users.get('w', [])
+                    mode_w_users.append(real_name)
+                    self.mode_of_users['w'] = mode_w_users
+                    print(mode_w_users)
             client_socket.send('You have successfully been set as a user\n\n'.encode('utf8'))
-        else:
-            client_socket.send('Someone else has your username, try again\n\n'.encode('utf8'))
 
     def who(self, client_socket, name, iso):
 
@@ -962,8 +997,8 @@ WHO WHOIS
                 else:
                     client_socket.send("User {user}\n\n".format(user=name).encode('utf8'))
                     return
-
-        client_socket.send("User does not exist\n\n".encode('utf8'))
+        else:
+            client_socket.send("User does not exist\n\n".encode('utf8'))
 
     def ping(self, client_socket):
         client_socket.send('PONG\n\n'.encode('utf8'))
@@ -971,10 +1006,9 @@ WHO WHOIS
     def pong(self, client_socket):
         client_socket.send('PING\n\n'.encode('utf8'))
 
-    def whois(self, client_socket, nicknames):
+    def whois(self, client_socket, nickname_list):
         message = ""
-        for nickname in nicknames:
-            print('hi')
+        for nickname in nickname_list:
             message += "Info about {nickname}\n".format(nickname=nickname)
             if nickname in self.clients_nicknames:
                 real_name = self.clients_nicknames[nickname]
@@ -982,23 +1016,22 @@ WHO WHOIS
 
                 username = self.client_usernames.get(real_name, None)
                 if username:
-                    message += "Username: {username}\n".format(username=username)
+                        message += "Username: {username}\n".format(username=username)
                 else:
                     message += "No username set\n"
 
-                member_of_channels = []
+                member_of_channels = ""
                 for (channel, user_list) in self.channel_users.items():
                     if real_name in user_list:
-                        member_of_channels.append(real_name)
-                if member_of_channels:
-                    member_of_channels = ", ".join(member_of_channels)
-                else:
-                    member_of_channels = ""
-                message += "Member of channels: {channels}".format(
-                    channels=member_of_channels
-                )
-            message += "End Info about {nickname}".format(nickname=nickname)
-        client_socket.send((message + "\n\n").encode('utf8'))
+                        print(channel)
+                        member_of_channels= member_of_channels + channel
+                        print(member_of_channels)
+                    member_of_channels = member_of_channels + ","
+                message += "Member of channels: {channels}\n".format(
+                            channels=member_of_channels
+                            )
+                message += "End Info about {nickname}".format(nickname=nickname)
+                client_socket.send((message + "\n\n").encode('utf8'))
 
 
 def main():
