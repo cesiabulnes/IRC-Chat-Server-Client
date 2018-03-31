@@ -1,0 +1,10 @@
+/pass pass
+/user cesia 2 * cesia
+/nick cesi
+/mode cesi + w
+/wallops message
+/away message1
+/ison cesi
+/rules
+/version
+/join channel1

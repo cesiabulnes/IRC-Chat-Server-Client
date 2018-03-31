@@ -8,6 +8,7 @@ import argparse
 import utils
 import logging
 import os
+import time
 
 
 class SocketThreadedTask(threading.Thread):
@@ -259,4 +260,5 @@ if __name__ == "__main__":
                    map(lambda command_line: command_line.strip(), commands))
         for command in commands_fixed:
             chatGUI.clientSocket.send(command)
+            time.sleep(0.1)
     root.mainloop()

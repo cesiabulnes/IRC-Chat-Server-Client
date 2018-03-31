@@ -1,3 +1,2 @@
-username,password,level,banned
-Cesibunny,123jujuy,admin,false
-hello123,123jujuy,user,false
+cesia pass user false
+alastair pass user false
